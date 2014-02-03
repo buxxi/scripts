@@ -16,10 +16,12 @@ class DeviceControl:
 			raise Exception("No such device")
 	
 	def turn_on(self):
-		print("Turning on")		
+		print("Turning on")
+		self.device.turn_on()		
 
 	def turn_off(self):
 		print("Turning off")
+		self.device.turn_off()
 		
 
 class StateFile:
