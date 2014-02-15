@@ -47,7 +47,9 @@ class SunClock:
 		a = Astral()
 		sun = a[self.city].sun(date = d, local = True)
 		d = sun["sunrise"].tzinfo.localize(d)
-		return d > sun["sunrise"] and d < sun["sunset"] 					
+		morning = sun["sunrise"] + (sun["sunrise"] - sun["dawn"]) #keep the lights on longer in the morning
+		evening = sun["sunset"] - (sun["dusk"] - sun["sunset"]) #turn on the lights earlier in the evening
+		return d > morning and d < evening 					
 
 
 if __name__ == '__main__':
