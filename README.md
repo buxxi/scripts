@@ -8,3 +8,4 @@ Collection of scripts I use on my machines, both server and workstation
 - tdsensor_to_rrd.py : read a temperature value from tellstick and update a local rrd-file with the value
 - tomatobandwidth_to_rrd.py : connects to a router running tomato firmware and writes the current bandwidth usage to a local rrd-file
 - monitors.py : script for quickly changing the layout when using multiple monitors
+- mpris2_websocket.py : server that exposes mpris2 dbus control for a machine over websocket
