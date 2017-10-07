@@ -7,6 +7,9 @@ import threading
 import json
 import logging
 import argparse
+import base64
+import requests
+import mimetypes
 
 from dbus.mainloop.glib import DBusGMainLoop
 from wsgiref.simple_server import make_server
@@ -46,6 +49,38 @@ class PlayerControl:
 		if 'xesam:artist' in m:
 			return ' '.join(m['xesam:artist'])
 		else:
+			return None
+
+	def album(self):
+		m = self.metadata()
+		if 'xesam:album' in m:
+			return m['xesam:album']
+		else:
+			return None
+
+	def art(self):
+		m = self.metadata()
+		try:
+			if 'mpris:artUrl' in m:
+				url = m['mpris:artUrl']
+				if url.startswith("file://"):
+					url = url[7:]
+					f = open(url, 'r')
+
+					return {
+						'content-type' : mimetypes.guess_type(url)[0],
+						'data' : base64.b64encode(f.read())
+					}
+				else:
+					response = requests.get(url)
+					return {
+						'content-type' : response.headers.get('content-type'),
+						'data' : base64.b64encode(response.content)
+					}
+			else:
+				return None
+		except:
+			print "error"
 			return None
 
 	def title(self):
@@ -192,6 +227,8 @@ class SocketHandler():
 			"playing" : {
 				"artist" : player.artist(),
 				"title" : player.title(),
+				"album" : player.album(),
+				"art" : player.art(),
 				"time" : {
 					"current" : player.current_position(),
 					"length" : player.length()
