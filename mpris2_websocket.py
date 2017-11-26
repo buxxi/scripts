@@ -1,4 +1,14 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+'''
+Exposes the MPRIS2 DBUS functionality over WebSockets.
+It sends a message when a player starts/pauses and can receive commands for playing/pausing/next/previous.
+
+Install dependencies by typing:
+	pip install ws4py
+	pip install netaddr
+'''
 
 import dbus
 import gobject
@@ -17,15 +27,6 @@ from ws4py.server.wsgirefserver import WSGIServer, WebSocketWSGIRequestHandler
 from ws4py.server.wsgiutils import WebSocketWSGIApplication
 from ws4py.websocket import WebSocket
 from netaddr import IPNetwork, IPAddress
-
-'''
-Exposes the MPRIS2 DBUS functionality over WebSockets.
-It sends a message when a player starts/pauses and can receive commands for playing/pausing/next/previous.
-
-Install dependencies by typing:
-	pip install ws4py
-	pip install netaddr
-'''
 
 logger = logging.getLogger('mpris2_websocket')
 
@@ -218,12 +219,12 @@ class SocketHandler():
 		logger.error("unknown action %s" % (action))
 
 	def no_player(self):
-		self.send_all({
+		self.send_all(lambda : {
 			"no_player" : True
 		})
 
 	def playing(self, player):
-		self.send_all({
+		self.send_all(lambda : {
 			"playing" : {
 				"artist" : player.artist(),
 				"title" : player.title(),
@@ -238,7 +239,7 @@ class SocketHandler():
 		})
 
 	def paused(self, player):
-		self.send_all({
+		self.send_all(lambda : {
 			"paused" : {
 				"player" : str(player)
 			}
@@ -246,11 +247,13 @@ class SocketHandler():
 
 	def resend(self, socket):
 		if self.previous_message:
-			socket.send(self.previous_message)
+			socket.send(json.dumps(self.previous_message()))
 
 	def send_all(self, message):
-		message = json.dumps(message)
 		self.previous_message = message
+
+		message = json.dumps(message())
+
 		logger.debug("Sending %s to %s clients" % (message, len(self.sockets)))
 		for socket in self.sockets:
 			socket.send(message)
