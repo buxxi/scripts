@@ -15,15 +15,18 @@ All the pins are hardcoded it the main-method as seen below:
 	GPIO 11	= LCD D7
 
 Install dependencies by typing:
-	pip install ws4py	
+	pip install ws4py
 '''
 
+import logging
 import threading
 import time
 import unicodedata
 import json
 import argparse
 from ws4py.client.threadedclient import WebSocketClient
+
+logger = logging.getLogger('mpris2_lcd')
 
 '''
 Check if the modules required to run it on the Raspberry Pi is available
@@ -34,8 +37,8 @@ try:
 	from RPi import GPIO
 	using_rpi = True
 except RuntimeError as e:
-	print "Missing packages or not a raspberry pi"
-	print e
+	logger.error("Missing packages or not a raspberry pi")
+	logger.error(e)
 
 '''
 Constants for how the LCD should be updated
@@ -50,7 +53,7 @@ It will output the data to console instead with a virtual screen in the same siz
 '''
 class ConsoleLCD:
 	def clear(self):
-		print chr(27) + "[2J"
+		print(chr(27) + "[2J")
 		pass
 
 	def write_string(self, text):
@@ -59,10 +62,10 @@ class ConsoleLCD:
 		if (len(lines) == 1):
 			lines.append("")
 
-		print "╔════════════════╗"
-		print "║%s║" % (str(lines[0]))
-		print "║%s║" % (str(lines[1]))
-		print "╚════════════════╝"
+		print("╔════════════════╗")
+		print("║%s║" % (str(lines[0])))
+		print("║%s║" % (str(lines[1])))
+		print("╚════════════════╝")
 
 '''
 The state the screen should be in when no player is active
@@ -191,16 +194,20 @@ class PlayerListener(WebSocketClient):
 		self.state = NoPlayerState()
 
 	def received_message(self, message):
-		data = json.loads(message.data)
-		if 'playing' in data:
-			data = data['playing']
-			self.state = StartedState(to_ascii(data['player']), "%s - %s" % (to_ascii(data['artist']), to_ascii(data['title'])), data['time']['current'], data['time']['length'])
-		elif 'no_player' in data:
-			self.state = NoPlayerState()
-		elif 'paused' in data:
-			self.state = PausedState(to_ascii(data['paused']['player']))
+		try:
+			data = json.loads(message.data)
+			if 'playing' in data:
+				data = data['playing']
+				self.state = StartedState(to_ascii(data['player']), format_title(data['artist'], data['title']), data['time']['current'], data['time']['length'])
+			elif 'no_player' in data:
+				self.state = NoPlayerState()
+			elif 'paused' in data:
+				self.state = PausedState(to_ascii(data['paused']['player']))
 
-		self.event.set()
+			self.event.set()
+		except:
+			logger.error("Error handling message: %s" % (message))
+			exit()
 
 	def output(self):
 		while (True):
@@ -208,6 +215,19 @@ class PlayerListener(WebSocketClient):
 			new_state = self.state.output(self.lcd, self.event)
 			if new_state:
 				self.state = new_state
+
+'''
+Formats the artist and title into a single String
+If only title exists it wont output any artist.
+If both is unknown it will be empty.
+'''
+def format_title(artist, title):
+	if artist and title:
+		return "%s - %s" % (to_ascii(artist), to_ascii(title))
+	elif title:
+		return to_ascii(title)
+	else:
+		return ''
 
 '''
 If the text doesn't fit on the screen we need to trim it or otherwise pad it

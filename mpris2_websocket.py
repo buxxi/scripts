@@ -117,7 +117,10 @@ class PlayerControl:
 		return to_plain_objects(self.properties.Get('org.mpris.MediaPlayer2.Player', 'Metadata'))
 
 	def __str__(self):
-		return self.properties.Get('org.mpris.MediaPlayer2', 'Identity')
+		try:
+			return self.properties.Get('org.mpris.MediaPlayer2', 'Identity')
+		except:
+			return 'Unknown player'
 
 '''
 The class that listens to the DBUS for events regarding the different MediaPlayers.
@@ -256,7 +259,10 @@ class SocketHandler():
 
 		logger.debug("Sending %s to %s clients" % (message, len(self.sockets)))
 		for socket in self.sockets:
-			socket.send(message)
+			try:
+				socket.send(message)
+			except:
+				logger.error("Error sending message %s to %s" % (message, socket))
 
 '''
 An implementation of the WebSocket so we can have the WebSocket in a container instead of just created by the WebSocketServer directly.

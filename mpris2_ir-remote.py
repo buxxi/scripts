@@ -16,12 +16,15 @@ Install dependencies by typing:
 	pip install ws4py
 '''
 
+import logging
 import argparse
 import json
 import time
 import threading
 import random
 from ws4py.client.threadedclient import WebSocketClient
+
+logger = logging.getLogger('mpris2_remote')
 
 '''
 Check if the lirc module exists
@@ -31,8 +34,8 @@ try:
 	import lirc
 	using_lirc = True
 except ImportError as e:
-	print "Missing package lirc, using console instead"
-	print e
+	logger.error("Missing package lirc, using console instead")
+	logger.error(e)
 
 '''
 Dummy implementation for debugging or when lirc is not available
@@ -67,7 +70,7 @@ class RemoteListener:
 		while (True):
 			code = lirc.nextcode()
 			action = self.resolve_action(code)
-			print "Action: %s" % (action)
+			logger.info("Action: %s" % (action))
 			if action != None:
 				self.client.send_action(action)
 
