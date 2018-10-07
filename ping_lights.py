@@ -35,8 +35,8 @@ class PingMachine:
         self.ip = ip
 
     def answers(self):
-        ip = socket.gethostbyname(
-            self.ip)  # To not send user input directly to a system call, lookup the ip for the hostname
+        # To not send user input directly to a system call, lookup the ip for the hostname
+        ip = socket.gethostbyname(self.ip)
         status = subprocess.call(["/bin/ping", "-c", "1", "-w", "1", ip], stdout=subprocess.PIPE)
         return status == 0
 
@@ -71,6 +71,8 @@ if __name__ == '__main__':
             device.turn_off()
 
         if answered_now:
+            print ("Device answered to ping")
             state.touch()
         else:
+            print ("Device did not answer to ping")
             state.remove()
