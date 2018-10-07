@@ -11,7 +11,6 @@ Install dependencies by typing:
 
 import sys
 import os
-import pytz
 from datetime import datetime
 from astral import Astral
 from tellcore.telldus import TelldusCore
@@ -51,25 +50,31 @@ class StateFile:
             os.utime(self.path, None)
 
 
-class SunClock:
-    def __init__(self, city):
+class SunTimer:
+    def __init__(self, city, current_date):
         self.city = city
+        self.sun = self.load_sun_data(current_date)
 
-    def bright(self, d):
-        a = Astral()
-        sun = a[self.city].sun(date=d, local=True)
-        d = sun["sunrise"].tzinfo.localize(d)
-        morning = sun["sunrise"] + (sun["sunrise"] - sun["dawn"])  # keep the lights on longer in the morning
-        evening = sun["sunset"] - (sun["dusk"] - sun["sunset"])  # turn on the lights earlier in the evening
-        return d > morning and d < evening
+    def bright(self, check_date):
+        # The time it takes for the sun to go down, activate the lights that much before it even starts to happen
+        shift_time = (self.sun["sunrise"] - self.sun["dawn"])
+
+        morning = self.sun["sunrise"] + shift_time  # keep the lights on longer in the morning
+        evening = self.sun["sunset"] - shift_time  # turn on the lights earlier in the evening
+        return check_date > morning and check_date < evening
+
+    def load_sun_data(self, current_date):
+        sun = Astral()[self.city].sun(date=current_date, local=True)
+        # Remove timezone stuff, local time should be the same timezone as the city requested...
+        return {key: value.replace(tzinfo=None) for (key, value) in sun.items()}
 
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
-        print ("Expected call './sunclock.py <statefile> <city> <telldus-id>'")
+        print ("Expected call './sun_lights.py <statefile> <city> <telldus-id>'")
     else:
         state = StateFile(sys.argv[1])
-        clock = SunClock(sys.argv[2])
+        timer = SunTimer(sys.argv[2], datetime.today())
         device = DeviceControl(int(sys.argv[3]))
 
         last = state.time()
@@ -78,9 +83,9 @@ if __name__ == '__main__':
         if last is None:
             print("No previous state file, waiting for next call")
         else:
-            if clock.bright(now) and not clock.bright(last):
+            if timer.bright(now) and not timer.bright(last):
                 device.turn_off()
-            elif not clock.bright(now) and clock.bright(last):
+            elif not timer.bright(now) and timer.bright(last):
                 device.turn_on()
             else:
                 print("Nothing changed, doing nothing")
