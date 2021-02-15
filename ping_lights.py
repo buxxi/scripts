@@ -91,5 +91,3 @@ if __name__ == '__main__':
     else:
         print ("Device did not answer to ping")
         state.remove()
-
-    device.turn_off()
