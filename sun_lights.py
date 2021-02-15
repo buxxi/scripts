@@ -11,13 +11,19 @@ Install dependencies by typing:
 
 import sys
 import os
+import pytz
+import argparse
+import time
 from datetime import datetime
-from astral import Astral
+from astral.sun import sun
+from astral.geocoder import lookup, database
 from tellcore.telldus import TelldusCore
 
 
 class DeviceControl:
-    def __init__(self, id):
+    def __init__(self, id, times, delay):
+        self.times = times
+        self.delay = delay
         devices = TelldusCore().devices()
 
         devices = [d for d in devices if d.id == id]
@@ -27,12 +33,18 @@ class DeviceControl:
             raise Exception("No such device")
 
     def turn_on(self):
-        print("Turning on")
-        self.device.turn_on()
+        for x in range(self.times):
+            print("Turning on")
+            self.device.turn_on()
+            if x != self.times - 1:
+                time.sleep(self.delay)
 
     def turn_off(self):
-        print("Turning off")
-        self.device.turn_off()
+        for x in range(self.times):
+            print("Turning off")
+            self.device.turn_off()
+            if x != self.times - 1:
+                time.sleep(self.delay)
 
 
 class StateFile:
@@ -41,7 +53,7 @@ class StateFile:
 
     def time(self):
         if os.path.exists(self.path):
-            return datetime.fromtimestamp(os.path.getmtime(self.path))
+            return datetime.utcfromtimestamp(os.path.getmtime(self.path)).replace(tzinfo=pytz.UTC)
         else:
             return None
 
@@ -52,7 +64,7 @@ class StateFile:
 
 class SunTimer:
     def __init__(self, city, current_date):
-        self.city = city
+        self.city = lookup(city, database())
         self.sun = self.load_sun_data(current_date)
 
     def bright(self, check_date):
@@ -61,33 +73,39 @@ class SunTimer:
 
         morning = self.sun["sunrise"] + shift_time  # keep the lights on longer in the morning
         evening = self.sun["sunset"] - shift_time  # turn on the lights earlier in the evening
+
         return check_date > morning and check_date < evening
 
     def load_sun_data(self, current_date):
-        sun = Astral()[self.city].sun(date=current_date, local=True)
-        # Remove timezone stuff, local time should be the same timezone as the city requested...
-        return {key: value.replace(tzinfo=None) for (key, value) in sun.items()}
+        s = sun(self.city.observer, date=current_date)
+        return s
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
-        print ("Expected call './sun_lights.py <statefile> <city> <telldus-id>'")
+    parser = argparse.ArgumentParser(description="Triggers a Tellstick device to change if the state of sunrise/sunset differs from previous call")
+    parser.add_argument("--file", required=True, help="The file that keeps the state")
+    parser.add_argument("--city", required=True, help="The name of the city that should be checked")
+    parser.add_argument("--device", required=True, type=int, help="The id of the device")
+    parser.add_argument("--repeat", required=False, type=int, default=1, help="Amount of times the call should be repeated")
+    parser.add_argument("--delay", required=False, type=int, default=3, help="Amount of seconds to wait between repeats")
+
+    args = parser.parse_args()
+
+    state = StateFile(args.file)
+    timer = SunTimer(args.city, datetime.today())
+    device = DeviceControl(args.device, args.repeat, args.delay)
+
+    last = state.time()
+    now = datetime.utcnow().replace(tzinfo=pytz.UTC)
+
+    if last is None:
+        print("No previous state file, waiting for next call")
     else:
-        state = StateFile(sys.argv[1])
-        timer = SunTimer(sys.argv[2], datetime.today())
-        device = DeviceControl(int(sys.argv[3]))
-
-        last = state.time()
-        now = datetime.now()
-
-        if last is None:
-            print("No previous state file, waiting for next call")
+        if timer.bright(now) and not timer.bright(last):
+            device.turn_off()
+        elif not timer.bright(now) and timer.bright(last):
+            device.turn_on()
         else:
-            if timer.bright(now) and not timer.bright(last):
-                device.turn_off()
-            elif not timer.bright(now) and timer.bright(last):
-                device.turn_on()
-            else:
-                print("Nothing changed, doing nothing")
+            print("Nothing changed, doing nothing")
 
-        state.touch()
+    state.touch()
