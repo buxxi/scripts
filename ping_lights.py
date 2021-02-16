@@ -74,8 +74,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    print(args)
-
     state = StateFile(args.file)
     ping = PingMachine(args.host)
     device = DeviceControl(args.device, args.repeat, args.delay)
