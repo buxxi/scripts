@@ -51,7 +51,7 @@ class TextTVParser:
 
         lines = text.splitlines(True)
 
-        if not self.is_valid_page(lines[3]):
+        if not self.is_valid_page(lines):
             return None
 
         
@@ -63,9 +63,11 @@ class TextTVParser:
         return { 'title': title, 'description': description, 'link': link }
 
 
-    def is_valid_page(self, line):
+    def is_valid_page(self, lines):
+        if len(lines) == 1:
+            return False
         for category in self.categories:
-            if line.strip().startswith(category + " PUBLICERAD"):
+            if lines[3].strip().startswith(category + " PUBLICERAD"):
                 return True
         return False
 
@@ -102,7 +104,7 @@ class TextTVParser:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parses SVT text tv news and creates a RSS-feed from it")
     parser.add_argument("--source", required=False, default="https://www.svt.se/text-tv", help="The source page to fetch data from")
-    parser.add_argument("--index-pages", required=False, nargs="*", default=["101", "102", "104", "105"], help="The index pages which contains a list of pages with the articles")
+    parser.add_argument("--index-pages", required=False, nargs="*", default=["101", "102", "103", "104", "105"], help="The index pages which contains a list of pages with the articles")
     parser.add_argument("--categories", required=False, nargs="*", default=["INRIKES","UTRIKES"], help="The categories of news to fetch (e.g. INRIKES, FOTBOLL, SKIDOR)")
     parser.add_argument("--max-paragraphs", required=False, default=1, type=int, help="The amount of paragraphs that max should be included")
 
