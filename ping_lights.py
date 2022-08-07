@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Turns off a tellstick device when a machine stops answering to ping.
+Turns off a Conbee device when a machine stops answering to ping.
 
 Install dependencies by typing:
     pip3 install tellcore-py
@@ -14,27 +14,31 @@ import socket
 import subprocess
 import argparse
 import time
-from tellcore.telldus import TelldusCore
+import requests
 
 
 class DeviceControl:
-    def __init__(self, id, times, delay):
-        self.times = times
-        self.delay = delay
-        devices = TelldusCore().devices()
-
-        devices = [d for d in devices if d.id == id]
-        if len(devices) == 1:
-            self.device = devices[0]
+    def __init__(self, host, port, apikey, light_id, group_id):
+        self.base_url = 'http://%s:%s/api/%s' % (host, port, apikey)
+        if light_id:
+            self.device_path = 'lights/%s/state' % light_id
+        elif group_id:
+            self.device_path = 'groups/%s/action' % group_id
         else:
-            raise Exception("No such device")
+            raise Exception("light or group must be set")
+
+    def turn_on(self):
+        print("Turning on")
+        self.send({'on': True})
 
     def turn_off(self):
-        for x in range(self.times):
-            print("Turning off")
-            self.device.turn_off()
-            if x != self.times - 1:
-                time.sleep(self.delay)
+        print("Turning off")
+        self.send({'on': False})
+
+    def send(self, payload):
+        response = requests.put("%s/%s" % (self.base_url, self.device_path), json=payload)
+        if response.status_code != 200:
+            raise Exception(response.text)
 
 
 class PingMachine:
@@ -65,18 +69,21 @@ class StateFile:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Triggers a Tellstick device to change if the target machine stops answering to ping")
+    parser = argparse.ArgumentParser(description="Triggers a Conbee light to change if the target machine stops answering to ping")
     parser.add_argument("--file", required=True, help="The file that keeps the state")
-    parser.add_argument("--host", required=True, help="The host or ip of the target machine")
-    parser.add_argument("--device", required=True, type=int, help="The id of the device")
-    parser.add_argument("--repeat", required=False, type=int, default=1, help="Amount of times the call should be repeated")
-    parser.add_argument("--delay", required=False, type=int, default=3, help="Amount of seconds to wait between repeats")
+    parser.add_argument("--city", required=True, help="The name of the city that should be checked")
+    parser.add_argument("--light", required=False, type=int, help="The id of the light")
+    parser.add_argument("--group", required=False, type=int, help="The id of the group")
+    parser.add_argument("--host", required=True, help="The host where the Deconz instance is running")
+    parser.add_argument("--port", required=True, type=int, help="The port where thee Deconz instance is running")
+    parser.add_argument("--apikey", required=True, help="The API key that should be used for Deconz")
+    parser.add_argument("--ip", required=True, help="The host or ip of the target machine")
 
     args = parser.parse_args()
 
     state = StateFile(args.file)
-    ping = PingMachine(args.host)
-    device = DeviceControl(args.device, args.repeat, args.delay)
+    ping = PingMachine(args.ip)
+    device = DeviceControl(args.host, args.port, args.apikey, args.light, args.group)
 
     answered_now = ping.answers()
 
