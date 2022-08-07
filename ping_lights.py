@@ -1,11 +1,9 @@
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 """
 Turns off a Conbee device when a machine stops answering to ping.
-
-Install dependencies by typing:
-    pip3 install tellcore-py
 """
 
 import sys
