@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 '''
@@ -6,12 +6,11 @@ Exposes the MPRIS2 DBUS functionality over WebSockets.
 It sends a message when a player starts/pauses and can receive commands for playing/pausing/next/previous.
 
 Install dependencies by typing:
-	pip install ws4py
-	pip install netaddr
+	pip3 install gobject
+	pip3 install ws4py
 '''
 
 import dbus
-import gobject
 import re
 import threading
 import json
@@ -21,12 +20,13 @@ import base64
 import requests
 import mimetypes
 
+from gi.repository.GLib import MainLoop
 from dbus.mainloop.glib import DBusGMainLoop
 from wsgiref.simple_server import make_server
 from ws4py.server.wsgirefserver import WSGIServer, WebSocketWSGIRequestHandler
 from ws4py.server.wsgiutils import WebSocketWSGIApplication
 from ws4py.websocket import WebSocket
-from netaddr import IPNetwork, IPAddress
+from ipaddress import ip_address, ip_network
 
 logger = logging.getLogger('mpris2_websocket')
 
@@ -66,22 +66,21 @@ class PlayerControl:
 				url = m['mpris:artUrl']
 				if url.startswith("file://"):
 					url = url[7:]
-					f = open(url, 'r')
+					f = open(url, 'rb')
 
 					return {
 						'content-type' : mimetypes.guess_type(url)[0],
-						'data' : base64.b64encode(f.read())
+						'data' : base64.b64encode(f.read()).decode()
 					}
 				else:
-					response = requests.get(url)
+					response = requests.get(url.replace("open.spotify.com", "i.scdn.co"))
 					return {
 						'content-type' : response.headers.get('content-type'),
-						'data' : base64.b64encode(response.content)
+						'data' : base64.b64encode(response.content).decode()
 					}
 			else:
 				return None
 		except:
-			print "error"
 			return None
 
 	def title(self):
@@ -92,7 +91,7 @@ class PlayerControl:
 			return None
 
 	def length(self):
-		return self.metadata()['mpris:length'] / 1000000
+		return int(self.metadata()['mpris:length'] / 1000000)
 
 	def current_position(self):
 		#Spotify always reports 0 here, ca we query it in another way?
@@ -118,7 +117,7 @@ class PlayerControl:
 
 	def __str__(self):
 		try:
-			return self.properties.Get('org.mpris.MediaPlayer2', 'Identity')
+			return str(self.properties.Get('org.mpris.MediaPlayer2', 'Identity'))
 		except:
 			return 'Unknown player'
 
@@ -132,14 +131,12 @@ class PlayerListener:
 		self.bus = bus
 		self.resolve_active_player()
 		self.listener = listener
-		self.previous_event = {}
 
 	def signal_handler(self, *args):
-		#VLC sends a numeric event every time the time should be updated and Spotify sends multiple of the same events on startup, ignore those
-		if type(args[0]) != dbus.String or dbus.String('PlaybackStatus') not in args[1] or args[1] == self.previous_event:
+		#VLC sends a numeric event every time the time should be updated
+		if type(args[0]) != dbus.String or not (dbus.String('PlaybackStatus') in args[1] or dbus.String('Metadata')):
 			return
 
-		self.previous_event = to_plain_objects(args[1])
 		self.resolve_active_player()
 		if not self.active_player:
 			self.listener.no_player()
@@ -180,7 +177,7 @@ class SocketHandler():
 
 	def create_websocket(self, sock, protocols=None, extensions=None, environ=None, heartbeat_freq=None):
 		ip = sock.getpeername()[0]
-		if IPAddress(ip) not in IPNetwork(self.network_mask):
+		if ip_address(ip) not in ip_network(self.network_mask):
 			#TODO: this could probably send a 401 somehow...
 			raise Exception("%s is not allowed to connect" % (ip))
 		return ClientWebSocket(self, sock, protocols, extensions, environ, heartbeat_freq)
@@ -295,7 +292,7 @@ def to_plain_objects(input):
 	elif type(input) == dbus.Array:
 		return [to_plain_objects(a) for a in input]
 	elif type(input) in [dbus.String, dbus.ObjectPath]:
-		return unicode(input)
+		return str(input)
 	elif type(input) in [dbus.Int32, dbus.UInt32, dbus.UInt64, dbus.Int64]:
 		return int(input)
 	elif type(input) == dbus.Boolean:
@@ -311,8 +308,7 @@ Some loop stuff required to listen to DBUS signals
 '''
 def main_loop_init():
 	logger.info("Starting mainloop")
-	loop = gobject.MainLoop()
-	gobject.threads_init()
+	loop = MainLoop()
 	thread = threading.Thread(target=loop.run)
 	thread.daemon = True
 	thread.start()
