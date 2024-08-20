@@ -4,8 +4,10 @@
 import pytz
 from datetime import datetime
 import os
-from pgmagick import Image
+import exif
+import pgmagick
 import argparse
+import re
 
 
 class ExifDirectory:
@@ -17,17 +19,32 @@ class ExifDirectory:
         return file.lower().endswith('.jpg') or file.lower().endswith('.jpeg')
 
     def date_taken(self, path):
-        img = Image(path)
+        with open(path, 'rb') as data:
+            exif_time = None
 
-        exif_time = img.attribute('exif:DateTime')
-        if not exif_time or exif_time == 'unknown':
-            return None
-        else:
             try:
-                return int(self.timezone.localize(datetime.strptime(exif_time, '%Y:%m:%d %H:%M:%S')).timestamp())
-            except:
-                print("Invalid DateTime in EXIF for %s" % path)
+                img = exif.Image(data)
+                if hasattr(img, 'datetime'):
+                    exif_time = img.datetime
+                elif hasattr(img, 'datetime_original'):
+                    exif_time = img.datetime_original
+            except KeyError as e:
+                img = pgmagick.Image(path)
+                exif_time = img.attribute('exif:DateTime')
+
+            if not exif_time or exif_time == 'unknown':
                 return None
+            else:
+                try:
+                    return int(self.timezone.localize(datetime.strptime(exif_time, '%Y:%m:%d %H:%M:%S')).timestamp())
+                except:
+                    if re.match('^[0-9]{13}$', exif_time):
+                        return int(int(exif_time) / 1000)
+                    m = re.match('^([0-9]{4}:[0-9]{2}:[0-9]{2}) 24:([0-9]{2}:[0-9]{2})$', exif_time)
+                    if m:
+                        return int(self.timezone.localize(datetime.strptime(('%s 23:%s' % (m.group(1), m.group(2))), '%Y:%m:%d %H:%M:%S')).timestamp()) + 3600
+                    print("Invalid DateTime in EXIF for %s: %s" % (path, exif_time))
+                    return None
 
     def update(self):
         print("Traversing %s for updates" % self.source_path)
@@ -48,12 +65,13 @@ class ExifDirectory:
             if self.is_image(file):
                 path = os.path.abspath(os.path.join(root, file))
                 date = self.date_taken(path)
-                max_date = max(max_date, date) if max_date and date else date
+                
                 if date:
+                    max_date = max(max_date, date) if max_date else date
                     self.update_utime(path, date)
-
+        
         if max_date:
-            self.update_utime(root, date)
+            self.update_utime(root, max_date)
 
     def update_utime(self, path, date):
         current = os.stat(path)
@@ -62,7 +80,8 @@ class ExifDirectory:
             print ("Setting %s to %s" % (path, date))
             os.utime(path, (date, date))
         else:
-            print ("Already correct for %s " % path)
+            pass
+            #print ("Already correct for %s " % path)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Updates files modified time to date saved in the EXIF data")
