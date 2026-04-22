@@ -10,3 +10,4 @@ Collection of scripts I use on my machines, both server and workstation
 - mpris2_lcd.py : client that connects to the server mentioned above for displaying a the currently playing on a lcd using a raspberry pi
 - mpris2_ir-remote.py: client that connect to the server mentioned above for controlling a player with an ir remote
 - pir_power.py: control a raspberry pis monitor power with a PIR-sensor
+- tmdb_ratings_countries.py: a script to create a json summary of all movies from a user ratings on tmdb
