@@ -4,7 +4,7 @@
 import time
 import os
 import argparse
-from pgmagick import Image
+from pgmagick import Image, Blob
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -42,6 +42,10 @@ class ThumbnailGenerator:
             except ValueError:
                 print ("Invalid EXIF orientation, using default")
 
+        # Strip exif data
+        blob = Blob()
+        img.profile("*", blob)
+
         # Detect if we need to resize the large thumbnail
         if width > LARGE_MAX_WIDTH:
             height = int((float(height) / width) * LARGE_MAX_WIDTH)
@@ -59,6 +63,8 @@ class ThumbnailGenerator:
             img.rotate(90)
         elif orientation == 8:
             img.rotate(-90)
+        elif orientation == 3:
+            img.rotate(180)
 
         self.write_image(img, large_thumb_path)
 
