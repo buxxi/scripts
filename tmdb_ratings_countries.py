@@ -47,11 +47,27 @@ def fetch_movie_details(access_token, movie_id):
 	return response.json()
 
 
+def normalize_country_codes(country_codes):
+	country_mapping = {
+		"HK": ["CN"],  # Hong Kong -> China, because the map I'm using doesn't handle them
+		"TW": ["CN"],  # Taiwan -> China, because the map I'm using doesn't handle them
+		"YU": ["RS", "HR", "BA", "SI", "MK", "ME", "XK"]  # Yugoslavia -> successor states
+	}
+	
+	normalized = []
+	for country in country_codes:
+		if country in country_mapping:
+			normalized.extend(country_mapping[country])
+		else:
+			normalized.append(country)
+	
+	return normalized
+
 def parse_countries(movie_details):
 	origin_country = movie_details.get("origin_country")
 
 	if origin_country:
-		return origin_country
+		return normalize_country_codes(origin_country)
 	else:
 		return ["UNKNOWN"]
 
@@ -83,7 +99,7 @@ def get_ratings_by_country(access_token, account_id):
 				country_stats[country_code]["solo"] += 1
 			else:
 				country_stats[country_code]["group"] += 1
-			country_stats[country_code]["movies"].append(movie_id)
+			country_stats[country_code]["movies"].append({"id": movie_id, "title": movie_title})
 
 	return country_stats
 
