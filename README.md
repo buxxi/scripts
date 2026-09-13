@@ -22,3 +22,5 @@ Collection of scripts I use on my machines, both server and workstation
 - `mpris2_lcd.py`: client that connects to the server mentioned above for displaying the currently playing on a lcd using a raspberry pi
 - `mpris2_ir-remote.py`: client that connect to the server mentioned above for controlling a player with an ir remote
 
+## Backup
+- `idle_monitor_script_runner.py`: a script that runs scripts on system idle/screen blank using native DBus
