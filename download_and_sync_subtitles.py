@@ -43,7 +43,7 @@ def sync_subtitles(video, subtitles):
 	return count
 
 def sync_subtitle(video_file_path, subtitle_file_path):
-	args = make_parser().parse_args([video_file_path, "-i", subtitle_file_path, "-o", subtitle_file_path, "--split-penalty"])
+	args = make_parser().parse_args([video_file_path, "-i", subtitle_file_path, "-o", subtitle_file_path])
 	ffsubsync.run(args)
 
 def main():
