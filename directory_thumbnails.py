@@ -8,10 +8,7 @@ from pgmagick import Image, Blob
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-LARGE_MAX_WIDTH = 1280
-LARGE_MAX_HEIGHT = 720
-SMALL_WIDTH_AND_HEIGHT = 100
-
+WIDTH_AND_HEIGHT = 100
 
 class NeedsRescanHandler(FileSystemEventHandler):
     def __init__(self):
@@ -28,7 +25,7 @@ class ThumbnailGenerator:
     def __init__(self):
         pass
 
-    def generate(self, source_path, small_thumb_path, large_thumb_path):
+    def generate(self, source_path, thumb_path):
         img = Image(source_path)
 
         width = img.size().width()
@@ -46,17 +43,9 @@ class ThumbnailGenerator:
         blob = Blob()
         img.profile("*", blob)
 
-        # Detect if we need to resize the large thumbnail
-        if width > LARGE_MAX_WIDTH:
-            height = int((float(height) / width) * LARGE_MAX_WIDTH)
-            width = LARGE_MAX_WIDTH
-        elif height > LARGE_MAX_HEIGHT:
-            width = int((float(width) / height) * LARGE_MAX_HEIGHT)
-            height = LARGE_MAX_HEIGHT
-
-        # Rescale the large thumbnail if dimensions doesn't match
-        if width != img.size().width() or height != img.size().height():
-            img.sample("!%sx%s" % (width, height))
+        # Crop the thumbnail and then resize it to the correct size
+        img.crop("%sx%s" % (min(width, height), min(width, height)))
+        img.sample("%sx%s" % (WIDTH_AND_HEIGHT, WIDTH_AND_HEIGHT))
 
         # Rotate the image if needed
         if orientation == 6:
@@ -66,13 +55,7 @@ class ThumbnailGenerator:
         elif orientation == 3:
             img.rotate(180)
 
-        self.write_image(img, large_thumb_path)
-
-        # Crop the small thumbnail and then resize it to the correct size
-        img.crop("%sx%s" % (min(width, height), min(width, height)))
-        img.sample("%sx%s" % (SMALL_WIDTH_AND_HEIGHT, SMALL_WIDTH_AND_HEIGHT))
-
-        self.write_image(img, small_thumb_path)
+        self.write_image(img, thumb_path)
 
     def write_image(self, img, path):
         # Create the directory tree and then write the image
@@ -114,14 +97,11 @@ class ThumbnailDirectory:
         print("Started observing %s for updates" % self.source_path)
         observer.schedule(self.event_handler, path=self.source_path, recursive=True)
 
-    def small_path(self, relative_path):
-        return os.path.join(self.target_path, os.path.dirname(relative_path), 'small', os.path.basename(relative_path))
-
-    def large_path(self, relative_path):
-        return os.path.join(self.target_path, os.path.dirname(relative_path), 'large', os.path.basename(relative_path))
+    def thumb_path(self, relative_path):
+        return os.path.join(self.target_path, os.path.dirname(relative_path), os.path.basename(relative_path))
 
     def thumbs_exists(self, relative_path):
-        return os.path.exists(self.small_path(relative_path)) and os.path.exists(self.large_path(relative_path))
+        return os.path.exists(self.thumb_path(relative_path))
 
     def is_image(self, file):
         return file.lower().endswith('.jpg') or file.lower().endswith('.jpeg')
@@ -142,8 +122,7 @@ class ThumbnailDirectory:
                         try:
                             generator.generate(
                                 os.path.join(self.source_path, relative_path),
-                                self.small_path(relative_path),
-                                self.large_path(relative_path)
+                                self.thumb_path(relative_path)
                             )
                             print ("Generated thumbs for %s" % relative_path)
                         except RuntimeError as e:
