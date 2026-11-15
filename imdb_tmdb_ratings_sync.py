@@ -1,5 +1,4 @@
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -11,10 +10,12 @@ import requests
 
 class ImdbRatingFetcher:
 	def __enter__(self):
-		options = FirefoxOptions()
-		options.add_argument("--headless")
-		service = Service()
-		self.driver = webdriver.Firefox(service=service, options=options)
+		options = ChromeOptions()
+		options.add_argument('--remote-debugging-port=9222')
+		options.add_argument("--headless=new")
+		options.add_argument("--disable-blink-features=AutomationControlled")
+		options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:158.0) Gecko/20100101 Firefox/158.0")
+		self.driver = webdriver.Chrome(options=options)
 		return self
 
 	def __exit__(self, type, value, traceback):
@@ -104,7 +105,7 @@ def resolve_unrated_on_tmdb(imdb_ratings, tmdb_ratings, tmdb_api):
 		if tmdb_id not in tmdb_ratings:
 			result.append({'tmdb_id': tmdb_id, 'rating': imdb['rating']})
 		else:
-			print(f'Found one rated, everything after that should already have been synched')
+			print(f'{imdb["imdb_id"]} has already been voted on, everything before that should have been synced already')
 			return result
 	return result
 
@@ -117,7 +118,9 @@ def main(access_token, account_id, imdb_user_id):
 		tmdb_ratings = tmdb.fetch_movie_ratings() + tmdb.fetch_tvseries_ratings()
 
 		to_be_rated = resolve_unrated_on_tmdb(imdb_ratings, tmdb_ratings, tmdb)
+		print(f'{len(to_be_rated)} unrated movies found')
 		for new_rating in reversed(to_be_rated):
+			print(f'Rating {new_rating["rating"]} on {new_rating["tmdb_id"]}')
 			tmdb.add_rating(new_rating['tmdb_id'], new_rating['rating'])
 
 if __name__ == "__main__":
